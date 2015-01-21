@@ -18,6 +18,7 @@ use std::io::fs::{self, PathExtensions};
 
 
 pub struct Change {
+    path: Path,
     start_byte: u32,
     end_byte: u32,
     text: String
@@ -25,39 +26,51 @@ pub struct Change {
 
 pub type ChangeSet = Vec<Change>;
 
-pub fn reprint(file: &Path, mut changes: ChangeSet) {
+pub fn reprint(mut changes: ChangeSet) {
     changes.sort();
-
-    if let Err(msg) = verify(&changes) {
-        println!("Verification error: {}",  msg);
-        return;
-    }
-
-    let input = match read_file(file) {
-        Ok(i) => i,
-        Err(msg) => {
-            println!("Error reading file: {}",  msg);
+    let paths = paths(&changes);
+    for file in paths.iter() {
+        if let Err(msg) = verify(&changes) {
+            println!("Verification error: {}",  msg);
             return;
         }
-    };
 
-    let changes_size = changes.iter().fold(0i64, |a, c| a + c.delta());
-    let mut buf: Vec<u8> = Vec::with_capacity((input.as_bytes().len() as i64 +
-                                               changes_size) as usize);
-    match process(input, changes, &mut buf) {
-        Ok(()) => {
-            if let Err(msg) = write_file(file, buf) {
-                println!("Error writing file: {}",  msg);
+        let input = match read_file(*file) {
+            Ok(i) => i,
+            Err(msg) => {
+                println!("Error reading file: {}",  msg);
+                return;
+            }
+        };
+
+        let changes_size = changes.iter().fold(0i64, |a, c| a + c.delta());
+        let mut buf: Vec<u8> = Vec::with_capacity((input.as_bytes().len() as i64 +
+                                                   changes_size) as usize);
+        match process(input, &changes, &mut buf) {
+            Ok(()) => {
+                if let Err(msg) = write_file(*file, buf) {
+                    println!("Error writing file: {}",  msg);
+                    return;
+                }
+            }
+            Err(msg) => {
+                println!("Error processing changes: {}",  msg);
                 return;
             }
         }
-        Err(msg) => {
-            println!("Error processing changes: {}",  msg);
-            return;
+    }
+}
+
+fn paths<'a>(changes: &'a ChangeSet) -> Vec<&'a Path> {
+    let mut result = vec![];
+    let mut cur: Option<&Path> = None;
+    for c in changes.iter() {
+        if cur.is_none() || cur.unwrap() != &c.path {
+            cur = Some(&c.path);
+            result.push(&c.path);
         }
     }
-
-    // Success!
+    result
 }
 
 // Assumes changes is sorted.
@@ -97,7 +110,7 @@ fn read_file(file: &Path) -> Result<String, String> {
 
 // precondition: changes == changes.sort() && verify(changes)
 fn process(input: String,
-           changes: ChangeSet,
+           changes: &ChangeSet,
            buf: &mut Vec<u8>)
 -> Result<(), String> {
     let input = input.as_bytes();
@@ -176,7 +189,7 @@ fn write_file(input_path: &Path, buf: Vec<u8>) -> Result<(), String> {
 
 impl PartialEq for Change {
     fn eq(&self, other: &Change) -> bool {
-        self.start_byte == other.start_byte
+        self.path == other.path && self.start_byte == other.start_byte
     }
 }
 
@@ -184,19 +197,26 @@ impl Eq for Change {}
 
 impl Ord for Change {
     fn cmp(&self, other: &Change) -> std::cmp::Ordering {
-        self.start_byte.cmp(&other.start_byte)
+        match self.path.cmp(&other.path) {
+            std::cmp::Ordering::Equal => self.start_byte.cmp(&other.start_byte),
+            o => o
+        }
     }
 }
 
 impl PartialOrd for Change {
     fn partial_cmp(&self, other: &Change) -> Option<std::cmp::Ordering> {
-        self.start_byte.partial_cmp(&other.start_byte)
+        match self.path.cmp(&other.path) {
+            std::cmp::Ordering::Equal => self.start_byte.partial_cmp(&other.start_byte),
+            o => Some(o)
+        }
     }
 }
 
 impl Change {
-    pub fn new(start_byte: u32, end_byte: u32, text: String) -> Change {
+    pub fn new(path: Path, start_byte: u32, end_byte: u32, text: String) -> Change {
         Change {
+            path: path,
             start_byte: start_byte,
             end_byte: end_byte,
             text: text
@@ -210,7 +230,8 @@ impl Change {
 }
 
 fn main() {
-    let path = Path::new("/home/ncameron/reprint/data/hello.rs");
-    let change = Change::new(3, 8, "Goodbye cruel".to_string());
-    reprint(&path, vec![change]);
+    let change = Change::new(Path::new("/home/ncameron/reprint/data/hello.rs"),
+                             3, 8,
+                             "Goodbye cruel".to_string());
+    reprint(vec![change]);
 }
