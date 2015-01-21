@@ -1,0 +1,9 @@
+[package]
+
+name = "reprint"
+version = "0.0.1"
+authors = ["Nicholas Cameron <nrc@ncameron.org>"]
+description = "library for reprinting a file with changes"
+repository = "https://github.com/nick29581/libreprint"
+readme = "README.md"
+license = "Apache-2.0/MIT"
