@@ -128,16 +128,16 @@ fn write_file(input_path: &Path, buf: Vec<u8>) -> Result<(), String> {
     // Prepare file names.
     let input_name = match input_path.as_str() {
         Some(n) => n.to_string(),
-        None => return Err(format!("Couldn't turn path '{:?}' into a string", input_path))
+        None => return Err(format!("Couldn't turn path '{}' into a string", input_path.display()))
     };
 
     let tmp_path = Path::new(input_name.clone() + ".tmp");
     let bk_path = Path::new(input_name.clone() + ".bk");
     if tmp_path.exists() {
-        return Err(format!("File '{:?}' already exists", tmp_path))
+        return Err(format!("File '{}' already exists", tmp_path.display()))
     }
     if bk_path.exists() {
-        return Err(format!("File '{:?}' already exists", bk_path))
+        return Err(format!("File '{}' already exists", bk_path.display()))
     }
 
     // Write to temporary file.
@@ -145,28 +145,28 @@ fn write_file(input_path: &Path, buf: Vec<u8>) -> Result<(), String> {
                                              FileMode::Open,
                                              FileAccess::Write) {
         Ok(f) => f,
-        Err(e) => return Err(format!("Couldn't open '{:?}': {}", tmp_path, e.desc))
+        Err(e) => return Err(format!("Couldn't open '{}': {}", tmp_path.display(), e.desc))
     };
     match tmp_file.write(&buf[]) {
         Ok(()) => {}
-        Err(e) => return Err(format!("Couldn't write to '{:?}': {}", tmp_path, e.desc))
+        Err(e) => return Err(format!("Couldn't write to '{}': {}", tmp_path.display(), e.desc))
     }
 
     // Rename input file to backup.
     match fs::rename(input_path, &bk_path) {
         Ok(()) => {},
-        Err(e) => return Err(format!("Couldn't rename '{:?}' to '{:?}': {}",
-                                     input_path,
-                                     bk_path,
+        Err(e) => return Err(format!("Couldn't rename '{}' to '{}': {}",
+                                     input_path.display(),
+                                     bk_path.display(),
                                      e.desc))
     }
 
     // Rename temp file to input file.
     match fs::rename(&tmp_path, input_path) {
         Ok(()) => {},
-        Err(e) => return Err(format!("Couldn't rename '{:?}' to '{:?}': {}",
-                                     tmp_path,
-                                     input_path,
+        Err(e) => return Err(format!("Couldn't rename '{}' to '{}': {}",
+                                     tmp_path.display(),
+                                     input_path.display(),
                                      e.desc))
     }
 
